@@ -40,7 +40,7 @@
                 id="IDG_VS_MM_TOOLSADDINS" />
         <Strings>
           <ButtonText></ButtonText>
-          <CommandName>SpyDef</CommandName>
+          <CommandName>DefILSpy</CommandName>
         </Strings>
       </Menu>
     </Menus>
@@ -56,7 +56,8 @@
                 id="TopLevelMenu"/>
       </Group>
       <Group guid="guidSpyDefContextMenuCmdSet"
-             id="SpyDefContextGroup">
+             id="SpyDefContextGroup"
+             priority="0x0600">
         <Parent guid="guidSHLMainMenu"
                 id="IDM_VS_CTXT_CODEWIN" />
       </Group>
@@ -80,7 +81,7 @@
         <Parent guid="guidSpyDefinitionCommandPackageCmdSet"
                 id="MyMenuGroup" />
         <Icon guid="guidImages"
-              id="bmpPic1" />
+              id="bmpPicSearch" />
         <Strings>
           <ButtonText>Set ILSpy Path</ButtonText>
         </Strings>
@@ -93,9 +94,9 @@
                 id="SpyDefContextGroup"/>
         <!--IDM_VS_CTXT_CODEWIN-->
         <Icon guid="guidImages"
-              id="bmpPic2"/>
+              id="bmpPicSearch"/>
         <Strings>
-          <ButtonText>Show Definition in ILSpy</ButtonText>
+          <ButtonText>Show Definition in ILSpy...</ButtonText>
         </Strings>
       </Button>
     </Buttons>

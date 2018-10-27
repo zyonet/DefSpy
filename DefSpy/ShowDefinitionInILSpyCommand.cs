@@ -13,6 +13,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
+using System.Windows.Threading;
 using EnvDTE;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -274,6 +275,7 @@ namespace DefSpy
         #region helper
         void ShowInfo(string text)
         {
+            Dispatcher.CurrentDispatcher.VerifyAccess();
             if (_statusBar == null)
                 try
                 {

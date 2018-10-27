@@ -1,5 +1,5 @@
 ﻿//------------------------------------------------------------------------------
-// <copyright file="SpyDefinitionCommandPackage.cs" company="Company">
+// <copyright file="SpyDefinitionCommandPackage.cs" company="zyonet">
 //     Copyright (c) Company.  All rights reserved.
 // </copyright>
 //------------------------------------------------------------------------------
