@@ -3,16 +3,25 @@
                  xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011"
                  xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
   <Metadata>
-    <Identity Id="DefSpy.Zyonet.109039d3-d8d9-41e1-993c-d557ba93822a"
+    <Identity Id="DefILSpy.Zyonet.109039d3-d8d9-41e1-993c-d557ba93822a"
               Version="1.0"
               Language="en-US"
-              Publisher="Zyonet" />
-    <DisplayName>DefSpy</DisplayName>
-    <Description>Empty VSIX Project.</Description>
+              Publisher="Yong Zhao" />
+    <DisplayName>DefILSpy</DisplayName>
+    <Description xml:space="preserve">Visual Studio Extension that shows definition of an external Type/Method under cursor in ILSpy through a right-click menu item.</Description>
+    <MoreInfo>https://github.com/zyonet/DefSpy</MoreInfo>
+    <Icon>DefILSpy-Icon.PNG</Icon>
+    <PreviewImage>right-click-menu.PNG</PreviewImage>
   </Metadata>
   <Installation>
     <InstallationTarget Id="Microsoft.VisualStudio.Community"
                         Version="[14.0]" />
+    <InstallationTarget Version="[14.0,15.0)"
+                        Id="Microsoft.VisualStudio.IntegratedShell" />
+    <InstallationTarget Version="[14.0,15.0)"
+                        Id="Microsoft.VisualStudio.Pro" />
+    <InstallationTarget Version="[14.0,15.0)"
+                        Id="Microsoft.VisualStudio.Enterprise" />
   </Installation>
   <Dependencies>
     <Dependency Id="Microsoft.Framework.NDP"

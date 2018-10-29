@@ -13,8 +13,10 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
+using System.Windows.Threading;
 using EnvDTE;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.VisualStudio.ComponentModelHost;
@@ -140,7 +142,9 @@ namespace DefSpy
                 ShowInfo(id);
                 INamedTypeSymbol namedTypeSymbol = symbolAtCursor as INamedTypeSymbol;
 
-                var assemblySymbol = namedTypeSymbol.ContainingAssembly;
+                var assemblySymbol = (namedTypeSymbol != null)?namedTypeSymbol.ContainingAssembly
+                    :symbolAtCursor.ContainingAssembly;
+
                 var assembly = Assembly.Load(assemblySymbol.Identity.Name);
                 var args = $"\"{assembly.Location}\" /navigateTo:{id} /singleInstance";
                 if (string.IsNullOrEmpty(DefSpy.Default.ILSpyPath))
@@ -228,12 +232,40 @@ namespace DefSpy
 
             SyntaxNode rootNode = codeDoc.GetSyntaxRootAsync().Result;
             SyntaxToken st = rootNode.FindToken(pos);
-
             var semanticModel = codeDoc.GetSemanticModelAsync().Result;
+            var parentKind = st.Parent.Kind();
+
+            //credit: https://github.com/verysimplenick/GoToDnSpy/blob/master/GoToDnSpy/GoToDnSpy.cs 
             //a SyntaxNode is parent of a SyntaxToken
-            var symbolInfo = semanticModel.GetSymbolInfo(st.Parent);
-            selected = symbolInfo.Symbol ?? (symbolInfo.GetType().GetProperty("CandidateSymbols")
-                .GetValue(symbolInfo) as IEnumerable<ISymbol>)?.FirstOrDefault();
+            if (st.Kind() == SyntaxKind.IdentifierToken && (
+                       parentKind == SyntaxKind.PropertyDeclaration
+                    || parentKind == SyntaxKind.FieldDeclaration
+                    || parentKind == SyntaxKind.MethodDeclaration
+                    || parentKind == SyntaxKind.NamespaceDeclaration
+                    || parentKind == SyntaxKind.DestructorDeclaration
+                    || parentKind == SyntaxKind.ConstructorDeclaration
+                    || parentKind == SyntaxKind.OperatorDeclaration
+                    || parentKind == SyntaxKind.ConversionOperatorDeclaration
+                    || parentKind == SyntaxKind.EnumDeclaration
+                    || parentKind == SyntaxKind.EnumMemberDeclaration
+                    || parentKind == SyntaxKind.ClassDeclaration
+                    || parentKind == SyntaxKind.EventDeclaration
+                    || parentKind == SyntaxKind.EventFieldDeclaration
+                    || parentKind == SyntaxKind.InterfaceDeclaration
+                    || parentKind == SyntaxKind.StructDeclaration
+                    || parentKind == SyntaxKind.DelegateDeclaration
+                    || parentKind == SyntaxKind.IndexerDeclaration
+                    || parentKind == SyntaxKind.VariableDeclarator
+                    ))
+            {
+                selected = semanticModel.LookupSymbols(pos.Position, name: st.Text).FirstOrDefault();
+            }
+            else
+            {
+                var symbolInfo = semanticModel.GetSymbolInfo(st.Parent);
+                selected = symbolInfo.Symbol ?? (symbolInfo.GetType().GetProperty("CandidateSymbols")
+                    .GetValue(symbolInfo) as IEnumerable<ISymbol>)?.FirstOrDefault();
+            }
 
             var localSymbol = selected as ILocalSymbol;
 
@@ -243,6 +275,7 @@ namespace DefSpy
         #region helper
         void ShowInfo(string text)
         {
+            Dispatcher.CurrentDispatcher.VerifyAccess();
             if (_statusBar == null)
                 try
                 {
