@@ -1,0 +1,39 @@
+﻿{
+  "$schema": "http://json.schemastore.org/vsix-publish",
+  "categories": [ "build", "coding" ],
+  "identity": {
+    "internalName": "DefILSpy"
+  },
+  "assetFiles": [
+    {
+      "pathOnDisk": "Resources\\DefILSpy-Icon.PNG",
+      "targetPath": "Resources/DefILSpy-Icon.PNG"
+    },
+    {
+      "pathOnDisk": "Resources\\ILSpy-Definition-Window.PNG",
+      "targetPath": "Resources/ILSpy-Definition-Window.PNG"
+    },
+    {
+      "pathOnDisk": "Resources\\right-click-menu.PNG",
+      "targetPath": "Resources/right-click-menu.PNG"
+    },
+    {
+      "pathOnDisk": "Resources\\Select-ILSpy-Dlg.PNG",
+      "targetPath": "Resources/Select-ILSpy-Dlg.PNG"
+    },
+    {
+      "pathOnDisk": "Resources\\SetILSpyPath.PNG",
+      "targetPath": "Resources/SetILSpyPath.PNG"
+    },
+     {
+      "pathOnDisk": "Resources\\SetILSpyPath.PNG",
+      "targetPath": "Resources/SetILSpyPath.PNG"
+    }
+  ],
+  "overview": "readme.md",
+  "priceCategory": "free",
+  "publisher": "Zyonet-One",
+  "private": false,
+  "qna": true,
+  "repo": "https://github.com/zyonet/DefSpy"
+}

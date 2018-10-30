@@ -75,9 +75,15 @@
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>DefSpy.Designer.cs</LastGenOutput>
     </None>
+    <None Include="extension.manifest.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Include="Key.snk" />
     <None Include="packages.config">
       <SubType>Designer</SubType>
+    </None>
+    <None Include="README.md">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Include="source.extension.vsixmanifest">
       <SubType>Designer</SubType>
@@ -93,7 +99,24 @@
       <ResourceName>Menus.ctmenu</ResourceName>
       <SubType>Designer</SubType>
     </VSCTCompile>
-    <Content Include="Resources\SpyDefinitionCommand.png" />
+    <Content Include="Resources\DefILSpy-Icon.PNG">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\ILSpy-Definition-Window.PNG">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\right-click-menu.PNG">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\Select-ILSpy-Dlg.PNG">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\SetILSpyPath.PNG">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\SpyDefinitionCommand.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Include="Resources\SpyDefinitionCommandPackage.ico" />
     <Content Include="right-click-menu.PNG">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>

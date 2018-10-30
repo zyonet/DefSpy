@@ -12,6 +12,7 @@
     <MoreInfo>https://github.com/zyonet/DefSpy</MoreInfo>
     <Icon>DefILSpy-Icon.PNG</Icon>
     <PreviewImage>right-click-menu.PNG</PreviewImage>
+    <Tags>decompilation,coding</Tags>
   </Metadata>
   <Installation>
     <InstallationTarget Id="Microsoft.VisualStudio.Community"
