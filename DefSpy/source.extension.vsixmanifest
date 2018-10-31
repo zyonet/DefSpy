@@ -3,7 +3,7 @@
                  xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011"
                  xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
   <Metadata>
-    <Identity Id="DefILSpy.Zyonet.109039d3-d8d9-41e1-993c-d557ba93822a"
+    <Identity Id="DefILSpy.Zyonet-One.109039d3-d8d9-41e1-993c-d557ba93822a"
               Version="1.0"
               Language="en-US"
               Publisher="Yong Zhao" />
