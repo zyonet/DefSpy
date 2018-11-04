@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.Design;
 using System.Diagnostics;
+using System.IO;
 using System.IO.Packaging;
 using System.Linq;
 using System.Reflection;
@@ -29,6 +30,7 @@ using Microsoft.VisualStudio.TextManager.Interop;
 using IServiceProvider = System.IServiceProvider;
 using Package = Microsoft.VisualStudio.Shell.Package;
 using Process = System.Diagnostics.Process;
+using Project = EnvDTE.Project;
 
 namespace DefSpy
 {
@@ -71,6 +73,7 @@ namespace DefSpy
         private IVsStatusbar _statusBar;
 
         private static Process _ilSpyProcess;
+        private DTE _dte;
 
         [DllImport("user32.dll")]
         private static extern bool SetWindowText(IntPtr hWnd, string text);
@@ -101,6 +104,8 @@ namespace DefSpy
                 var menuItem = new MenuCommand(this.MenuItemCallback, menuCommandID);
                 commandService.AddCommand(menuItem);
             }
+
+            _dte = ServiceProvider.GetService(typeof (DTE)) as DTE;
         }
 
         /// <summary>
@@ -145,8 +150,28 @@ namespace DefSpy
                 var assemblySymbol = (namedTypeSymbol != null)?namedTypeSymbol.ContainingAssembly
                     :symbolAtCursor.ContainingAssembly;
 
-                var assembly = Assembly.Load(assemblySymbol.Identity.Name);
-                var args = $"\"{assembly.Location}\" /navigateTo:{id} /singleInstance";
+                var textView = getTextView();
+                var semanticModel = textView.Caret.Position.BufferPosition.Snapshot
+                    .GetOpenDocumentInCurrentContextWithChanges().GetSemanticModelAsync().Result;
+                var assemPath = GetAssemblyPath(semanticModel, assemblySymbol.Identity.ToString());
+                var realPath = assemPath;
+                Assembly assembly = null;
+                try
+                {
+                    assembly = Assembly.ReflectionOnlyLoad(assemblySymbol.Identity.Name);
+                    if (assembly != null)
+                    {
+                        //replace referecend assemblies path with real path
+                        realPath = assembly.Location;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine(ex.Message);
+                }
+
+                var args = $"\"{realPath}\" /navigateTo:{id} /singleInstance";
+
                 if (string.IsNullOrEmpty(DefSpy.Default.ILSpyPath))
                 {
                     SetILPathCommand.GetILSpyPath();
@@ -165,6 +190,8 @@ namespace DefSpy
                         }
                         Trace.WriteLine($"Launching {args}");
                         _ilSpyProcess = Process.Start(DefSpy.Default.ILSpyPath, args);
+                        SetWindowText(_ilSpyProcess.MainWindowHandle, $"ILSpy for DefILSpy");
+
                     }
                     else
                     {
@@ -225,38 +252,27 @@ namespace DefSpy
         private ISymbol getChosenSymbol()
         {
             ISymbol selected = null;
+
             var textView = getTextView();
             Microsoft.CodeAnalysis.Document codeDoc = textView.Caret.Position.BufferPosition.Snapshot
-               .GetOpenDocumentInCurrentContextWithChanges(); //textfeature extension method
-            var pos = textView.Caret.Position.BufferPosition;
+                .GetOpenDocumentInCurrentContextWithChanges(); //textfeature extension method
+            var semanticModel = codeDoc.GetSemanticModelAsync().Result;
 
             SyntaxNode rootNode = codeDoc.GetSyntaxRootAsync().Result;
-            SyntaxToken st = rootNode.FindToken(pos);
-            var semanticModel = codeDoc.GetSemanticModelAsync().Result;
+            var pos = textView.Caret.Position.BufferPosition;
+
+            var st = rootNode.FindToken(pos);
+
+            var curNode = rootNode.FindNode(new Microsoft.CodeAnalysis.Text.TextSpan(pos.Position, 0));
+            if (curNode == null)
+            {
+                curNode = st.Parent;
+            }
             var parentKind = st.Parent.Kind();
 
             //credit: https://github.com/verysimplenick/GoToDnSpy/blob/master/GoToDnSpy/GoToDnSpy.cs 
             //a SyntaxNode is parent of a SyntaxToken
-            if (st.Kind() == SyntaxKind.IdentifierToken && (
-                       parentKind == SyntaxKind.PropertyDeclaration
-                    || parentKind == SyntaxKind.FieldDeclaration
-                    || parentKind == SyntaxKind.MethodDeclaration
-                    || parentKind == SyntaxKind.NamespaceDeclaration
-                    || parentKind == SyntaxKind.DestructorDeclaration
-                    || parentKind == SyntaxKind.ConstructorDeclaration
-                    || parentKind == SyntaxKind.OperatorDeclaration
-                    || parentKind == SyntaxKind.ConversionOperatorDeclaration
-                    || parentKind == SyntaxKind.EnumDeclaration
-                    || parentKind == SyntaxKind.EnumMemberDeclaration
-                    || parentKind == SyntaxKind.ClassDeclaration
-                    || parentKind == SyntaxKind.EventDeclaration
-                    || parentKind == SyntaxKind.EventFieldDeclaration
-                    || parentKind == SyntaxKind.InterfaceDeclaration
-                    || parentKind == SyntaxKind.StructDeclaration
-                    || parentKind == SyntaxKind.DelegateDeclaration
-                    || parentKind == SyntaxKind.IndexerDeclaration
-                    || parentKind == SyntaxKind.VariableDeclarator
-                    ))
+            if (st.Kind() == SyntaxKind.IdentifierToken )
             {
                 selected = semanticModel.LookupSymbols(pos.Position, name: st.Text).FirstOrDefault();
             }
@@ -267,12 +283,62 @@ namespace DefSpy
                     .GetValue(symbolInfo) as IEnumerable<ISymbol>)?.FirstOrDefault();
             }
 
+
             var localSymbol = selected as ILocalSymbol;
 
-            return (localSymbol == null) ? selected : localSymbol.Type;
+            var rs = (localSymbol == null) ? selected : localSymbol.Type;
+            if (rs != null)
+                return rs;
+            else
+            {
+                return GetSymbolResolvableByILSpy(semanticModel, curNode);
+            }
         }
 
         #region helper
+
+        //https://github.com/icsharpcode/ILSpy/blob/master/ILSpy.AddIn/Commands/OpenCodeItemCommand.cs
+        ISymbol GetSymbolResolvableByILSpy(SemanticModel model, SyntaxNode node)
+        {
+            var current = node;
+            while (current != null)
+            {
+                var symbol = model.GetSymbolInfo(current).Symbol;
+                if (symbol == null)
+                {
+                    symbol = model.GetDeclaredSymbol(current);
+                }
+
+                // ILSpy can only resolve some symbol types, so allow them, discard everything else
+                if (symbol != null)
+                {
+                    switch (symbol.Kind)
+                    {
+                        case SymbolKind.ArrayType:
+                        case SymbolKind.Event:
+                        case SymbolKind.Field:
+                        case SymbolKind.Method:
+                        case SymbolKind.NamedType:
+                        case SymbolKind.Namespace:
+                        case SymbolKind.PointerType:
+                        case SymbolKind.Property:
+                            break;
+                        default:
+                            symbol = null;
+                            break;
+                    }
+                }
+
+                if (symbol != null)
+                    return symbol;
+
+                current = current is IStructuredTriviaSyntax
+                    ? ((IStructuredTriviaSyntax) current).ParentTrivia.Token.Parent
+                    : current.Parent;
+            }
+            return null;
+        }
+
         void ShowInfo(string text)
         {
             Dispatcher.CurrentDispatcher.VerifyAccess();
@@ -289,6 +355,62 @@ namespace DefSpy
 
             _statusBar.SetText(text);
         }
+
+        string GetAssemblyPath(SemanticModel semanticModel, string assemblyDef)
+        {
+            IEnumerator<AssemblyIdentity> refAsmNames = semanticModel.Compilation.ReferencedAssemblyNames.GetEnumerator();
+            IEnumerator<MetadataReference> refs = semanticModel.Compilation.References.GetEnumerator();
+
+            // try find in referenced assemblies first
+            while (refAsmNames.MoveNext())
+            {
+                refs.MoveNext();
+                if (!string.Equals(refAsmNames.Current.ToString(), assemblyDef, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var displayName = refs.Current.Display;
+                EnvDTE.Project project = null;
+                // try found project
+                foreach (EnvDTE.Project proj in _dte.Solution.Projects)
+                {
+                    if (!string.Equals(proj.Name, displayName, StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    project = proj;
+                    break;
+                }
+                // project reference
+                if (project != null)
+                {
+                    displayName = getProjectOutputPath(project);
+                }
+                return displayName;
+            }
+
+            //symbol defined in current project of active document
+            EnvDTE.Project curProject = _dte.ActiveDocument.ProjectItem.ContainingProject as EnvDTE.Project;
+            if (curProject != null)
+                return getProjectOutputPath(curProject);
+
+            return assemblyDef;
+        }
+
+        private static string getProjectOutputPath(Project curProject)
+        {
+            if (curProject != null)
+            {
+                var config = curProject.ConfigurationManager.ActiveConfiguration;
+                foreach (Property p in config.Properties)
+                {
+                    Debug.WriteLine($"{p.Name}: {p.Value}");
+                }
+
+                var prjFolder = Path.GetDirectoryName(curProject.FullName);
+                var outPath = Path.Combine(prjFolder, (config.Properties.Item("CodeAnalysisInputAssembly") as Property).Value.ToString());
+                return outPath;
+            }
+            return null;
+        }
+
         #endregion
 
     }
