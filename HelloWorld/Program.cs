@@ -22,8 +22,8 @@ namespace HelloWorld
 
             var urlBlder = new UrlBuilder("http://www.google.com?search=c#");
             Console.WriteLine($"{urlBlder.GetHost()}");
-            Console.Write("Press any key to exit...");
-            Console.Read();
+            //Console.Write("Press any key to exit...");
+            //Console.Read();
         }
     }
 
