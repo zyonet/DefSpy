@@ -13,6 +13,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HelloWorld", "HelloWorld\HelloWorld.csproj", "{20583221-4B7E-47ED-82E2-AC10125EDC31}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "TestProjects", "TestProjects", "{A2C97178-68CE-4EA0-96A8-9893BC8AA78E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestDriver", "TestDriver\TestDriver.csproj", "{7BD6A1FF-2C69-48B8-8780-13DCC5D6AA00}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,8 +31,15 @@ Global
 		{20583221-4B7E-47ED-82E2-AC10125EDC31}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{20583221-4B7E-47ED-82E2-AC10125EDC31}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{20583221-4B7E-47ED-82E2-AC10125EDC31}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7BD6A1FF-2C69-48B8-8780-13DCC5D6AA00}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7BD6A1FF-2C69-48B8-8780-13DCC5D6AA00}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7BD6A1FF-2C69-48B8-8780-13DCC5D6AA00}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7BD6A1FF-2C69-48B8-8780-13DCC5D6AA00}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{20583221-4B7E-47ED-82E2-AC10125EDC31} = {A2C97178-68CE-4EA0-96A8-9893BC8AA78E}
 	EndGlobalSection
 EndGlobal

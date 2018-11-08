@@ -27,7 +27,7 @@ namespace HelloWorld
         }
     }
 
-    class HelloWorld
+    public class HelloWorld
     {
         private string _lang;
 

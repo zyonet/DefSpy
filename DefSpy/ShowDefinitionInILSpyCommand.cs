@@ -5,6 +5,7 @@
 //------------------------------------------------------------------------------
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel.Design;
 using System.Diagnostics;
@@ -142,9 +143,9 @@ namespace DefSpy
             try
             {
                 var symbolAtCursor = getChosenSymbol();
-                Debug.Write($"Selected Symbol: {symbolAtCursor.Name} - {symbolAtCursor.Kind} - {symbolAtCursor.ContainingAssembly}");
+                Debug.WriteLine($" *** Selected Symbol: {symbolAtCursor.Name} - {symbolAtCursor.Kind} - {symbolAtCursor.ContainingAssembly}");
                 var id = symbolAtCursor.GetDocumentationCommentId();
-                ShowInfo(id);
+                //ShowInfo(id);
                 INamedTypeSymbol namedTypeSymbol = symbolAtCursor as INamedTypeSymbol;
 
                 var assemblySymbol = (namedTypeSymbol != null)?namedTypeSymbol.ContainingAssembly
@@ -153,24 +154,32 @@ namespace DefSpy
                 var textView = getTextView();
                 var semanticModel = textView.Caret.Position.BufferPosition.Snapshot
                     .GetOpenDocumentInCurrentContextWithChanges().GetSemanticModelAsync().Result;
-                var assemPath = GetAssemblyPath(semanticModel, assemblySymbol.Identity.ToString());
+                bool isProject;
+                var assemPath = GetAssemblyPath(semanticModel, assemblySymbol.Identity.ToString(), out isProject);
                 var realPath = assemPath;
                 Assembly assembly = null;
                 try
                 {
-                    assembly = Assembly.ReflectionOnlyLoad(assemblySymbol.Identity.Name);
-                    if (assembly != null)
+                    if (!isProject && assemPath != assemblySymbol.Identity.ToString())
                     {
-                        //replace referecend assemblies path with real path
-                        realPath = assembly.Location;
+                        Debug.WriteLine($" !!! - loading assembly {assemblySymbol.Identity.Name} ...");
+                        assembly = Assembly.ReflectionOnlyLoad(assemblySymbol.Identity.Name);
+                        if (assembly != null)
+                        {
+                            //replace referecend assemblies path with real path
+                            realPath = assembly.Location;
+                        }
                     }
                 }
                 catch (Exception ex)
                 {
                     Debug.WriteLine(ex.Message);
+                    Debug.WriteLine(ex.StackTrace);
                 }
 
                 var args = $"\"{realPath}\" /navigateTo:{id} /singleInstance";
+
+                ShowInfo(args);
 
                 if (string.IsNullOrEmpty(DefSpy.Default.ILSpyPath))
                 {
@@ -196,15 +205,16 @@ namespace DefSpy
                     else
                     {
                         //send a message to existing instance
-                        var msg = $"ILSpy:\r\n{assembly.Location}\r\n/navigateTo:{id}\r\n/singleInstance";
+                        var msg = $"ILSpy:\r\n{realPath}\r\n/navigateTo:{id}\r\n/singleInstance";
                         Send(_ilSpyProcess.MainWindowHandle, msg);
                     }
                 }
             }
             catch (Exception ex)
             {
-                ShowInfo(ex.Message);
-                Trace.TraceError(ex.Message);
+                ShowInfo(ex.Message + ":" + ex.StackTrace);
+                Debug.WriteLine(ex.Message);
+                Debug.WriteLine(ex.StackTrace);
             }
         }
 
@@ -356,42 +366,84 @@ namespace DefSpy
             _statusBar.SetText(text);
         }
 
-        string GetAssemblyPath(SemanticModel semanticModel, string assemblyDef)
+        string GetAssemblyPath(SemanticModel semanticModel, string assemblyDef, out bool isProject)
         {
             IEnumerator<AssemblyIdentity> refAsmNames = semanticModel.Compilation.ReferencedAssemblyNames.GetEnumerator();
             IEnumerator<MetadataReference> refs = semanticModel.Compilation.References.GetEnumerator();
 
+            isProject = false;
+            var projName = assemblyDef.Split(',').First().Trim();
+
             // try find in referenced assemblies first
+            MetadataReference metReference = null;
+            string displayName = "";
             while (refAsmNames.MoveNext())
             {
                 refs.MoveNext();
                 if (!string.Equals(refAsmNames.Current.ToString(), assemblyDef, StringComparison.OrdinalIgnoreCase))
                     continue;
 
-                var displayName = refs.Current.Display;
-                EnvDTE.Project project = null;
-                // try found project
-                foreach (EnvDTE.Project proj in _dte.Solution.Projects)
-                {
-                    if (!string.Equals(proj.Name, displayName, StringComparison.OrdinalIgnoreCase))
-                        continue;
-                    project = proj;
-                    break;
-                }
-                // project reference
-                if (project != null)
-                {
-                    displayName = getProjectOutputPath(project);
-                }
-                return displayName;
+                displayName = refs.Current.Display;
+                metReference = refs.Current;
+                if (!assemblyDef.Contains(displayName))
+                    //maybe a package path: 
+                    return displayName; 
+                    //maybe a reference assembly such as "C:\\Program Files (x86)\\Reference Assemblies\\Microsoft\\Framework\\.NETFramework\\v4.5.1\\mscorlib.dll"
             }
 
+            //var assembly = semanticModel.Compilation.GetAssemblyOrModuleSymbol(metReference);
+            //symbols defined in other projects of the same solution
+            EnvDTE.Project project = null;
+            // try found project
+            var prjItem = _dte.Solution.FindProjectItem(projName);
+            if (prjItem != null)
+            {
+                project = prjItem.ContainingProject;
+            }
+            foreach (EnvDTE.Project proj in _dte.Solution.Projects)
+            {
+                 project = _findProject(proj, projName);
+                if (project != null) break;
+            }
+            //project reference
+            if (project != null)
+            {
+                isProject = true;
+               return getProjectOutputPath(project);
+            }
             //symbol defined in current project of active document
             EnvDTE.Project curProject = _dte.ActiveDocument.ProjectItem.ContainingProject as EnvDTE.Project;
             if (curProject != null)
+            {
+                isProject = true;
                 return getProjectOutputPath(curProject);
+            }
 
             return assemblyDef;
+        }
+
+        private Project _findProject(Project proj, string projName)
+        {
+            if (proj == null ||  proj.Name == projName)
+                return proj;
+
+            Debug.WriteLine(proj.Name);
+            var count = proj.ProjectItems.Count;
+            Project found = null;
+            for (int i = 1; i <= count; ++i)
+            {
+                ProjectItem nextItem = proj.ProjectItems.Item(i);
+                Debug.WriteLine($"==> {nextItem.Name}");
+                if (nextItem.ContainingProject != null && nextItem.Name == projName)
+                    return nextItem.SubProject;
+                else
+                {
+                    found = _findProject(nextItem.SubProject, projName);
+                    if (found != null)
+                        return found;
+                }
+            }
+            return null;
         }
 
         private static string getProjectOutputPath(Project curProject)
