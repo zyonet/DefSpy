@@ -67,6 +67,7 @@
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
       <DependentUpon>DefSpy.settings</DependentUpon>
     </Compile>
+    <Compile Include="GacHelper.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SetILPathCommand.cs" />
     <Compile Include="ShowDefinitionInILSpyCommand.cs" />
