@@ -143,19 +143,25 @@ namespace DefSpy
             try
             {
                 var symbolAtCursor = getChosenSymbol();
-                Debug.WriteLine($" *** Selected Symbol: {symbolAtCursor.Name} - {symbolAtCursor.Kind} - {symbolAtCursor.ContainingAssembly}");
-                var id = symbolAtCursor.GetDocumentationCommentId();
+                Debug.WriteLine($" *** Selected Symbol: {symbolAtCursor?.Name} - {symbolAtCursor?.Kind} - {symbolAtCursor?.ContainingAssembly}");
+                var id = symbolAtCursor?.GetDocumentationCommentId();
                 //ShowInfo(id);
                 INamedTypeSymbol namedTypeSymbol = symbolAtCursor as INamedTypeSymbol;
+                var alias = symbolAtCursor as IAliasSymbol;
+                if (alias != null)
+                {
+                    namedTypeSymbol = alias.Target as INamedTypeSymbol;
+                    id = namedTypeSymbol.GetDocumentationCommentId();
+                }
 
                 var assemblySymbol = (namedTypeSymbol != null)?namedTypeSymbol.ContainingAssembly
-                    :symbolAtCursor.ContainingAssembly;
+                    :symbolAtCursor?.ContainingAssembly;
 
                 var textView = getTextView();
                 var semanticModel = textView.Caret.Position.BufferPosition.Snapshot
                     .GetOpenDocumentInCurrentContextWithChanges().GetSemanticModelAsync().Result;
                 bool isProject;
-                var fullName = assemblySymbol.ToDisplayString();
+                var fullName = assemblySymbol?.ToDisplayString();
                 var assemPath = GetAssemblyPath(semanticModel, fullName, out isProject);
                 var realPath = assemPath;
                 Assembly assembly = null;
@@ -167,7 +173,7 @@ namespace DefSpy
                     }
                     else 
                     {
-                        Debug.WriteLine($" !!! - loading assembly {assemblySymbol.Identity.Name} ...");
+                        Debug.WriteLine($" !!! - loading assembly {assemblySymbol?.Identity.Name} ...");
                         assembly = Assembly.Load(fullName); //such as System
                     }
 
