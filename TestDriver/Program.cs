@@ -11,6 +11,7 @@ namespace TestDriver
         static void Main(string[] args)
         {
             var hello = new HelloWorld.HelloWorld();
+            Console.WriteLine("Saying Hello...");
             hello.SayHello();
         }
     }

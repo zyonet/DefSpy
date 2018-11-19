@@ -155,20 +155,27 @@ namespace DefSpy
                 var semanticModel = textView.Caret.Position.BufferPosition.Snapshot
                     .GetOpenDocumentInCurrentContextWithChanges().GetSemanticModelAsync().Result;
                 bool isProject;
-                var assemPath = GetAssemblyPath(semanticModel, assemblySymbol.Identity.ToString(), out isProject);
+                var fullName = assemblySymbol.ToDisplayString();
+                var assemPath = GetAssemblyPath(semanticModel, fullName, out isProject);
                 var realPath = assemPath;
                 Assembly assembly = null;
                 try
                 {
-                    if (!isProject && assemPath != assemblySymbol.Identity.ToString())
+                    if (assemPath.Contains("packages") || isProject)
+                    {
+                        assembly = Assembly.ReflectionOnlyLoad(assemPath);
+                    }
+                    else 
                     {
                         Debug.WriteLine($" !!! - loading assembly {assemblySymbol.Identity.Name} ...");
-                        assembly = Assembly.ReflectionOnlyLoad(assemblySymbol.Identity.Name);
-                        if (assembly != null)
-                        {
-                            //replace referecend assemblies path with real path
-                            realPath = assembly.Location;
-                        }
+                        assembly = Assembly.Load(fullName); //such as System
+                    }
+
+                    if (assembly != null)
+                    {
+                        //replace referecend assemblies path with real path
+                        //e.g. C:\Windows\Microsoft.NET\Framework\v4.0.30319\mscorlib.dll
+                        assemPath = assembly.Location;
                     }
                 }
                 catch (Exception ex)
@@ -177,7 +184,13 @@ namespace DefSpy
                     Debug.WriteLine(ex.StackTrace);
                 }
 
-                var args = $"\"{realPath}\" /navigateTo:{id} /singleInstance";
+                var args = "";
+                if (assemPath.Contains("assembly\\GAC_"))
+                     args = $"\"{assemPath}\" /navigateTo:{id} /singleInstance";
+                else
+                {
+                    args = $"\"{realPath}\" /navigateTo:{id} /singleInstance";
+                }
 
                 ShowInfo(args);
 
@@ -376,7 +389,7 @@ namespace DefSpy
 
             // try find in referenced assemblies first
             MetadataReference metReference = null;
-            string displayName = "";
+            string displayName = assemblyDef;
             while (refAsmNames.MoveNext())
             {
                 refs.MoveNext();
@@ -385,10 +398,26 @@ namespace DefSpy
 
                 displayName = refs.Current.Display;
                 metReference = refs.Current;
-                if (!assemblyDef.Contains(displayName))
-                    //maybe a package path: 
-                    return displayName; 
-                    //maybe a reference assembly such as "C:\\Program Files (x86)\\Reference Assemblies\\Microsoft\\Framework\\.NETFramework\\v4.5.1\\mscorlib.dll"
+
+                //maybe a reference assembly such as "C:\\Program Files (x86)\\Reference Assemblies\\Microsoft\\Framework\\.NETFramework\\v4.5.1\\mscorlib.dll"
+                if (displayName.Contains("Reference Assemblies"))
+                {
+                    var fileName  = Path.GetFileName(displayName);
+                    displayName = Path.GetFileNameWithoutExtension(fileName);
+                    //e.g. C:\windows\Microsoft.Net\assembly\GAC_32\mscorlib\v4.0_4.0.0.0__b77a5c561934e089\mscorlib.dll
+                    var gacPath = GacHelper.GetAssemblyPath(displayName);
+                    if (gacPath.Item2)
+                        return gacPath.Item1;
+                    else
+                    {
+                        return displayName;
+                    }
+                }
+
+                if (displayName.ToLower().Contains("\\packages\\"))
+                {
+                    return displayName;
+                }
             }
 
             //var assembly = semanticModel.Compilation.GetAssemblyOrModuleSymbol(metReference);
