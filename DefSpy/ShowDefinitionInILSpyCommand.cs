@@ -450,6 +450,12 @@ namespace DefSpy
                 {
                     return displayName;
                 }
+
+                if (metReference.Properties.Kind == MetadataImageKind.Assembly
+                    && File.Exists(displayName))
+                {
+                    return displayName;
+                }
             }
 
             //var assembly = semanticModel.Compilation.GetAssemblyOrModuleSymbol(metReference);
