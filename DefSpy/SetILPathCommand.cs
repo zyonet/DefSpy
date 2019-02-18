@@ -7,10 +7,8 @@
 using System;
 using System.ComponentModel.Design;
 using System.Globalization;
-using System.IO.Packaging;
 using System.Windows.Forms;
 using Microsoft.VisualStudio.Shell;
-using Microsoft.VisualStudio.Shell.Interop;
 
 namespace DefSpy
 {

@@ -4,7 +4,7 @@
                  xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
   <Metadata>
     <Identity Id="DefILSpy.Zyonet-One.109039d3-d8d9-41e1-993c-d557ba93822a"
-              Version="1.0.4"
+              Version="1.0.5"
               Language="en-US"
               Publisher="Yong Zhao" />
     <DisplayName>DefILSpy</DisplayName>
@@ -34,6 +34,7 @@
                 DisplayName="Visual Studio MPF 14.0"
                 d:Source="Installed"
                 Version="[14.0]" />
+    <Dependency d:Source="Installed" Id="3a012d4e-6057-4e7c-8123-6d4be1d4723c" DisplayName=".NET Compiler Platform SDK" Version="[2.0.0.6140902,3.0)" d:InstallSource="Download" Location="https://marketplace.visualstudio.com/items?itemName=VisualStudioProductTeam.NETCompilerPlatformSDK" />
   </Dependencies>
   <Assets>
     <Asset Type="Microsoft.VisualStudio.VsPackage"

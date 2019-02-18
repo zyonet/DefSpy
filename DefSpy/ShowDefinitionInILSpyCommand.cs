@@ -5,12 +5,9 @@
 //------------------------------------------------------------------------------
 
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.ComponentModel.Design;
 using System.Diagnostics;
 using System.IO;
-using System.IO.Packaging;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -19,16 +16,12 @@ using System.Windows.Threading;
 using EnvDTE;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.Diagnostics;
-using Microsoft.CodeAnalysis.Text;
 using Microsoft.VisualStudio.ComponentModelHost;
 using Microsoft.VisualStudio.Editor;
-using Microsoft.VisualStudio.Shell;
+using Microsoft.VisualStudio.LanguageServices;
 using Microsoft.VisualStudio.Shell.Interop;
-using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Editor;
 using Microsoft.VisualStudio.TextManager.Interop;
-using IServiceProvider = System.IServiceProvider;
 using Package = Microsoft.VisualStudio.Shell.Package;
 using Process = System.Diagnostics.Process;
 using Project = EnvDTE.Project;
@@ -38,7 +31,7 @@ namespace DefSpy
     /// <summary>
     /// Command handler
     /// </summary>
-    internal sealed class ShowDefinitionInILSpyCommand
+    internal sealed class ShowDefinitionInILSpyCommand:ILSpyCommand
     {
         private struct CopyDataStruct
         {
@@ -61,10 +54,7 @@ namespace DefSpy
         /// </summary>
         public const int CommandId = 0x0101;
 
-        /// <summary>
-        /// Command menu group (command set GUID).
-        /// </summary>
-        public static readonly Guid CommandSet = new Guid("0B348AFC-8219-41DD-93CE-90AD6396B2EB");
+        
 
         /// <summary>
         /// VS Package that provides this command, not null.
@@ -75,6 +65,8 @@ namespace DefSpy
 
         private static Process _ilSpyProcess;
         private DTE _dte;
+        private VisualStudioWorkspace workspace;
+        //private Microsoft.VisualStudio.LanguageServices.RoslynVisualStudioWorkspace workspace;
 
         [DllImport("user32.dll")]
         private static extern bool SetWindowText(IntPtr hWnd, string text);
@@ -88,8 +80,9 @@ namespace DefSpy
         /// Adds our command handlers for menu (commands must exist in the command table file)
         /// </summary>
         /// <param name="package">Owner package, not null.</param>
-        private ShowDefinitionInILSpyCommand(Package package)
+        private ShowDefinitionInILSpyCommand(SpyDefinitionPackage package):base(package, CommandId)
         {
+
             if (package == null)
             {
                 throw new ArgumentNullException("package");
@@ -97,16 +90,21 @@ namespace DefSpy
 
             this.package = package;
 
-            OleMenuCommandService commandService =
-                this.ServiceProvider.GetService(typeof(IMenuCommandService)) as OleMenuCommandService;
-            if (commandService != null)
-            {
-                var menuCommandID = new CommandID(CommandSet, CommandId);
-                var menuItem = new MenuCommand(this.MenuItemCallback, menuCommandID);
-                commandService.AddCommand(menuItem);
-            }
+            //OleMenuCommandService commandService =
+            //    this.ServiceProvider.GetService(typeof(IMenuCommandService)) as OleMenuCommandService;
+            //if (commandService != null)
+            //{
+            //    var menuCommandID = new CommandID(ILSpyCommand.CommandSet, CommandId);
+            //    var menuItem = new MenuCommand(this.MenuItemCallback, menuCommandID);
+            //    commandService.AddCommand(menuItem);
+            //}
 
-            _dte = ServiceProvider.GetService(typeof (DTE)) as DTE;
+            _dte = Package.GetGlobalService(typeof (DTE)) as DTE;
+
+            var componentModel = (IComponentModel)Package.GetGlobalService(typeof(SComponentModel));
+            this.workspace = componentModel.GetService<VisualStudioWorkspace>() as VisualStudioWorkspace;
+
+
         }
 
         /// <summary>
@@ -117,17 +115,15 @@ namespace DefSpy
         /// <summary>
         /// Gets the service provider from the owner package.
         /// </summary>
-        private IServiceProvider ServiceProvider
-        {
-            get { return this.package; }
-        }
+       
 
         /// <summary>
         /// Initializes the singleton instance of the command.
         /// </summary>
         /// <param name="package">Owner package, not null.</param>
-        public static void Initialize(Package package)
+        public static void Initialize(SpyDefinitionPackage package)
         {
+            
             Instance = new ShowDefinitionInILSpyCommand(package);
         }
 
@@ -138,28 +134,41 @@ namespace DefSpy
         /// </summary>
         /// <param name="sender">Event sender.</param>
         /// <param name="e">Event args.</param>
-        private void MenuItemCallback(object sender, EventArgs e)
+        private async void MenuItemCallback(object sender, EventArgs e)
         {
             try
             {
+
+                var roslynDoc = GetRoslynDocument();
+                var semanticModel = await roslynDoc.GetSemanticModelAsync();
+
                 var symbolAtCursor = getChosenSymbol();
                 Debug.WriteLine($" *** Selected Symbol: {symbolAtCursor?.Name} - {symbolAtCursor?.Kind} - {symbolAtCursor?.ContainingAssembly}");
-                var id = symbolAtCursor?.GetDocumentationCommentId();
+
+                if (symbolAtCursor == null)
+                {
+                    ShowInfo("Cannot find symbol selected. Returning...");
+                }
+
+                var roslynProject = roslynDoc.Project;
+
+                var id = (symbolAtCursor.OriginalDefinition ?? symbolAtCursor)
+                    .GetDocumentationCommentId();
                 //ShowInfo(id);
+
                 INamedTypeSymbol namedTypeSymbol = symbolAtCursor as INamedTypeSymbol;
                 var alias = symbolAtCursor as IAliasSymbol;
                 if (alias != null)
                 {
                     namedTypeSymbol = alias.Target as INamedTypeSymbol;
-                    id = namedTypeSymbol.GetDocumentationCommentId();
+                    //id = namedTypeSymbol.GetDocumentationCommentId();
                 }
 
                 var assemblySymbol = (namedTypeSymbol != null)?namedTypeSymbol.ContainingAssembly
                     :symbolAtCursor?.ContainingAssembly;
 
-                var textView = getTextView();
-                var semanticModel = textView.Caret.Position.BufferPosition.Snapshot
-                    .GetOpenDocumentInCurrentContextWithChanges().GetSemanticModelAsync().Result;
+
+
                 bool isProject;
                 var fullName = assemblySymbol?.ToDisplayString();
                 var assemPath = GetAssemblyPath(semanticModel, fullName, out isProject);
@@ -261,10 +270,14 @@ namespace DefSpy
         private IWpfTextView getTextView()
         {
             IVsTextView textView = null;
-            var textMgr = ServiceProvider.GetService(typeof(SVsTextManager)) as IVsTextManager;
+            var textMgr = owner.GetServiceAsync(typeof(SVsTextManager)).Result as IVsTextManager;
             textMgr.GetActiveView(1, null, out textView);
 
-            var comModel = ServiceProvider.GetService(typeof(SComponentModel))
+            IVsUserData userData = textView as IVsUserData;
+            if (userData == null)
+                return null;
+
+            var comModel = owner.GetServiceAsync(typeof(SComponentModel)).Result
                 as IComponentModel;
             var editorFactory = comModel.GetService<IVsEditorAdaptersFactoryService>();
 
@@ -283,8 +296,8 @@ namespace DefSpy
             ISymbol selected = null;
 
             var textView = getTextView();
-            Microsoft.CodeAnalysis.Document codeDoc = textView.Caret.Position.BufferPosition.Snapshot
-                .GetOpenDocumentInCurrentContextWithChanges(); //textfeature extension method
+            Microsoft.CodeAnalysis.Document codeDoc = GetRoslynDocument();
+            //textfeature extension method
             var semanticModel = codeDoc.GetSemanticModelAsync().Result;
 
             SyntaxNode rootNode = codeDoc.GetSyntaxRootAsync().Result;
@@ -292,16 +305,23 @@ namespace DefSpy
 
             var st = rootNode.FindToken(pos);
 
-            var curNode = rootNode.FindNode(new Microsoft.CodeAnalysis.Text.TextSpan(pos.Position, 0));
+            var curNode = rootNode.FindNode(
+                new Microsoft.CodeAnalysis.Text.TextSpan(pos.Position, 0));
+
             if (curNode == null)
             {
                 curNode = st.Parent;
             }
-            var parentKind = st.Parent.Kind();
+
+            var sym = GetSymbolResolvableByILSpy(semanticModel, curNode);
+            if (sym != null)
+                return sym;
+            
+            var parentKind = st.Parent.RawKind;
 
             //credit: https://github.com/verysimplenick/GoToDnSpy/blob/master/GoToDnSpy/GoToDnSpy.cs 
             //a SyntaxNode is parent of a SyntaxToken
-            if (st.Kind() == SyntaxKind.IdentifierToken )
+            if (st.RawKind== (int) SyntaxKind.IdentifierToken )
             {
                 selected = semanticModel.LookupSymbols(pos.Position, name: st.Text).FirstOrDefault();
             }
@@ -316,15 +336,21 @@ namespace DefSpy
             var localSymbol = selected as ILocalSymbol;
 
             var rs = (localSymbol == null) ? selected : localSymbol.Type;
-            if (rs != null)
-                return rs;
-            else
-            {
-                return GetSymbolResolvableByILSpy(semanticModel, curNode);
-            }
+            return rs;
         }
 
         #region helper
+        Microsoft.CodeAnalysis.Document GetRoslynDocument()
+
+        {
+            var document = this._dte.ActiveDocument;
+            var selection = (EnvDTE.TextPoint)((EnvDTE.TextSelection)document.Selection).ActivePoint;
+            var id = this.workspace.CurrentSolution.GetDocumentIdsWithFilePath(document.FullName).FirstOrDefault();
+            if (id == null)
+                return null;
+
+            return this.workspace.CurrentSolution.GetDocument(id);
+        }
 
         //https://github.com/icsharpcode/ILSpy/blob/master/ILSpy.AddIn/Commands/OpenCodeItemCommand.cs
         ISymbol GetSymbolResolvableByILSpy(SemanticModel model, SyntaxNode node)
@@ -374,7 +400,7 @@ namespace DefSpy
             if (_statusBar == null)
                 try
                 {
-                    _statusBar = ServiceProvider.GetService(typeof(SVsStatusbar)) as IVsStatusbar;
+                    _statusBar = owner.GetServiceAsync(typeof(SVsStatusbar)).Result as IVsStatusbar;
                 }
                 catch
                 {
@@ -500,5 +526,10 @@ namespace DefSpy
 
         #endregion
 
+        protected override void OnExecute(object sender, EventArgs e)
+        {
+            MenuItemCallback(sender, e);
+        }
     }
+
 }

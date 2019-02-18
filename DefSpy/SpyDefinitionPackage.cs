@@ -5,17 +5,12 @@
 //------------------------------------------------------------------------------
 
 using System;
-using System.ComponentModel.Design;
-using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Threading;
-using Microsoft.VisualStudio;
-using Microsoft.VisualStudio.OLE.Interop;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
-using Microsoft.Win32;
 using Task = System.Threading.Tasks.Task;
 
 namespace DefSpy
@@ -67,6 +62,44 @@ namespace DefSpy
             SetILPathCommand.Initialize(this);
             ShowDefinitionInILSpyCommand.Initialize(this);
             return base.InitializeAsync(cancellationToken, progress);
+        }
+
+        #endregion
+
+        #region helper
+
+        public void ShowMessage(string format, params object[] items)
+        {
+            ShowMessage(OLEMSGBUTTON.OLEMSGBUTTON_OK, OLEMSGDEFBUTTON.OLEMSGDEFBUTTON_FIRST, OLEMSGICON.OLEMSGICON_INFO, format, items);
+        }
+
+        public void ShowMessage(OLEMSGICON icon, string format, params object[] items)
+        {
+            ShowMessage(OLEMSGBUTTON.OLEMSGBUTTON_OK, OLEMSGDEFBUTTON.OLEMSGDEFBUTTON_FIRST, icon, format, items);
+        }
+
+        public int ShowMessage(OLEMSGBUTTON buttons, OLEMSGDEFBUTTON defaultButton, OLEMSGICON icon, string format, params object[] items)
+        {
+            IVsUIShell uiShell = (IVsUIShell)GetService(typeof(SVsUIShell));
+            Guid clsid = Guid.Empty;
+            int result;
+            Microsoft.VisualStudio.ErrorHandler.ThrowOnFailure(
+                uiShell.ShowMessageBox(
+                    0,
+                    ref clsid,
+                    "ILSpy AddIn",
+                    string.Format(CultureInfo.CurrentCulture, format, items),
+                    string.Empty,
+                    0,
+                    buttons,
+                    defaultButton,
+                    icon,
+                    0,        // false
+                    out result
+                )
+            );
+
+            return result;
         }
 
 
